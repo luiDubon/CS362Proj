@@ -97,7 +97,7 @@ void onReceiveCommand(int count) {
   }
 
   // ---- Start Game ----
-  if (incoming == "s") {
+  if (incoming == "1") {
     startFlag = true;
     return;
   }
