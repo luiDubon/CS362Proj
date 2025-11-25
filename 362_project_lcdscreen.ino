@@ -96,7 +96,7 @@ void onReceiveCommand(int count) {
   char cmd = Wire.read();
   count--;
 
-  // ---- Start Game: command '1' ----
+  // ---- Start Game: command 's' ----
   if (cmd == 's') {
     startFlag = true;
     // ignore any extra bytes
