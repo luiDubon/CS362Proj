@@ -17,19 +17,19 @@ unsigned long lastScrollTime = 0;
 const unsigned long scrollInterval = 400;
 
 // ============ GAME STATE ============
-const int STATE_IDLE = 0;
+const int STATE_IDLE   = 0;
 const int STATE_PLAYING = 1;
-const int STATE_WIN = 2;
-const int STATE_LOSE = 3;
+const int STATE_WIN    = 2;
+const int STATE_LOSE   = 3;
 
 int gameState = STATE_IDLE;
 
 // I2C flags
 volatile bool startFlag = false;
-volatile bool winFlag = false;
-volatile bool loseFlag = false;
+volatile bool winFlag   = false;
+volatile bool loseFlag  = false;
 
-// score from master (ex: l.20 → score = 20)
+// score from master (ex: l20 or l.20 → 20)
 volatile int pendingScore = 0;
 
 // ============ RGB STRIP ============
@@ -76,7 +76,7 @@ void loop() {
 
   if (loseFlag) {
     loseFlag = false;
-    showLose(pendingScore);   // score from "l.xx"
+    showLose(pendingScore);   // score built from chars after 'l'
   }
 
   if (gameState == STATE_IDLE) {
@@ -90,31 +90,49 @@ void loop() {
 //                 I2C RECEIVE
 // ======================================================
 void onReceiveCommand(int count) {
-  String incoming = "";
+  if (count <= 0) return;
 
-  while (Wire.available()) {
-    incoming += (char)Wire.read();
-  }
+  // First char is the command
+  char cmd = Wire.read();
+  count--;
 
-  // ---- Start Game ----
-  if (incoming == "1") {
+  // ---- Start Game: command '1' ----
+  if (cmd == 's') {
     startFlag = true;
+    // ignore any extra bytes
+    while (Wire.available()) Wire.read();
     return;
   }
 
-  // ---- Win ----
-  if (incoming == "w") {
+  // ---- Win: command 'w' ----
+  if (cmd == 'w') {
     winFlag = true;
+    while (Wire.available()) Wire.read();
     return;
   }
 
-  // ---- Lose + Score ----
-  // Format expected: "l.20"
-  if (incoming.startsWith("l.")) {
-    pendingScore = incoming.substring(2).toInt();
+  // ---- Lose + score: command 'l' ----
+  // Remaining bytes are characters of score, e.g. "20" or ".20"
+  if (cmd == 'l') {
+    int score = 0;
+
+    while (Wire.available()) {
+      char c = Wire.read();
+
+      // keep only digits
+      if (c >= '0' && c <= '9') {
+        score = score * 10 + (c - '0');
+      }
+      // if it's '.', just ignore it
+    }
+
+    pendingScore = score;
     loseFlag = true;
     return;
   }
+
+  // Unknown command: flush remaining bytes
+  while (Wire.available()) Wire.read();
 }
 
 // ======================================================
@@ -155,7 +173,7 @@ void scrollWelcomeMessage() {
   int len = welcomeMsg.length();
   String window = "";
 
-  for (int i=0; i<LCD_COLS; i++) {
+  for (int i = 0; i < LCD_COLS; i++) {
     int idx = (scrollIndex + i) % len;
     window += welcomeMsg[idx];
   }
