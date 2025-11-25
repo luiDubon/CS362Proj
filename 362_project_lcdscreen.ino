@@ -3,7 +3,7 @@
 #include <Adafruit_NeoPixel.h>
 
 // ============ I2C ADDRESS ============
-#define LCD_SLAVE_ADDR 0x20
+#define LCD_SLAVE_ADDR 1
 
 // ============ LCD SETUP ============
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
@@ -53,7 +53,7 @@ void setup() {
   strip.setBrightness(40);
   strip.show();
 
-  Wire.begin(LCD_SLAVE_ADDR);
+  Wire.begin(1);
   Wire.onReceive(onReceiveCommand);
 
   gameState = STATE_IDLE;
