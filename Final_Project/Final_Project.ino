@@ -2,13 +2,12 @@
 #include <Wire.h>
 #include <string.h>
 
-#define MAX_KEYS   100      // max digits we’ll store
-#define SLAVE_ADDR 0x10     // I2C address for THIS keypad Arduino
+#define MAX_KEYS   100      
+#define SLAVE_ADDR 0x10     
 
 const byte ROWS = 4;
 const byte COLS = 4;
 
-// Key layout
 char hexaKeys[ROWS][COLS] = {
   {'D', '#', '0', '*'},
   {'C', '9', '8', '7'},
@@ -16,21 +15,15 @@ char hexaKeys[ROWS][COLS] = {
   {'A', '3', '2', '1'}
 };
 
-// You wired keypad pins 1–8 -> Arduino pins 2–9
-byte rowPins[ROWS] = {2, 3, 4, 5};   // keypad rows
-byte colPins[COLS] = {6, 7, 8, 9};   // keypad columns
+byte rowPins[ROWS] = {2, 3, 4, 5};
+byte colPins[COLS] = {6, 7, 8, 9};
 
 Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
 
-// Buffer for digits 0-9
 char keyBuffer[MAX_KEYS];
 int  keyCount = 0;
 
-// State flags
-bool inputEnabled = false;   // true = we’re accepting keypad input
-bool sendReady    = false;   // true = sequence finished & ready to send
-
-// Forward declarations for I2C callbacks
+// Forward declarations
 void sendKeys();
 void receiveCommand(int bytes);
 
@@ -38,114 +31,90 @@ void receiveCommand(int bytes);
 // SETUP
 // -------------------------------------------------------
 void setup() {
-  // I2C slave at address SLAVE_ADDR
   Wire.begin(SLAVE_ADDR);
-  Wire.onRequest(sendKeys);        // when master calls Wire.requestFrom()
-  Wire.onReceive(receiveCommand);  // when master calls Wire.beginTransmission()
+  Wire.onRequest(sendKeys);
+  Wire.onReceive(receiveCommand);
 
   Serial.begin(9600);
-  Serial.println("Keypad slave online");
-
-  // TEMP: uncomment this line if you want to test keypad
-  // without the master sending 'E' (enable) first:
-  // inputEnabled = true;
+  Serial.println("Keypad slave online (always-reading mode)");
 }
 
 // -------------------------------------------------------
-// MAIN LOOP
+// MAIN LOOP — always reading keypad input
 // -------------------------------------------------------
 void loop() {
+
   char key = customKeypad.getKey();
 
-  if (!inputEnabled) {
-    return;   // ignore keypad until master enables it
-  }
-
   if (key) {
-    // Accept only digits 0–9
+
+    // If digit 0-9, store it
     if (isDigit(key)) {
       if (keyCount < MAX_KEYS) {
         keyBuffer[keyCount++] = key;
-
-        Serial.print("Stored key: ");
+        Serial.print("Stored digit: ");
         Serial.println(key);
-      } else {
-        Serial.println("Buffer full, ignoring extra keys");
       }
     }
-    // '#' ends the sequence and marks it ready to send
+
+    // '#' marks the end of the sequence
     else if (key == '#') {
-      sendReady    = true;
-      inputEnabled = false;   // stop reading until master is done
-      Serial.println("Sequence complete, ready to send...");
+      Serial.println("Sequence ended with '#'");
+      // KeyCount stays—master decides when to read
     }
-    // Everything else ignored (A,B,C,D,*, etc.)
+
+    // ignore all other keys
     else {
-      Serial.print("Unaccepted input: ");
+      Serial.print("Ignored key: ");
       Serial.println(key);
     }
   }
 }
 
 // -------------------------------------------------------
-// I2C onRequest: master is asking for data
+// I2C SEND — called ONLY when master requests data
 // -------------------------------------------------------
 void sendKeys() {
-  if (!sendReady) {
-    // Not ready; send count 0 so master knows
-    Wire.write((byte)0);
-    Serial.println("Master requested data, but not ready...");
-    return;
-  }
 
-  // First send how many keys
+  // send count first
   Wire.write((byte)keyCount);
 
-  // Then send each digit
+  // send keys only if count > 0
   for (int i = 0; i < keyCount; i++) {
     Wire.write((byte)keyBuffer[i]);
   }
 
-  Serial.print("Sent ");
+  Serial.print("Master requested data — sent ");
   Serial.print(keyCount);
-  Serial.println(" keys to master");
+  Serial.println(" keys.");
 
-  // Reset for next sequence
-  keyCount   = 0;
-  sendReady  = false;
+  // After sending, clear buffer
+  keyCount = 0;
 }
 
 // -------------------------------------------------------
-// I2C onReceive: master sends us commands
+// I2C RECEIVE — only used for clearing/reset
 // -------------------------------------------------------
 void receiveCommand(int bytes) {
+
   while (Wire.available()) {
     char cmd = (char)Wire.read();
 
     switch (cmd) {
-      case 'R':     // Reset / clear sequence
-        keyCount   = 0;
-        sendReady  = false;
-        Serial.println("Sequence cleared (R)");
-        break;
 
-      case 'E':     // Enable keypad reading
-        inputEnabled = true;
-        sendReady    = false;
-        Serial.println("Reading enabled (E)");
-        break;
-
-      case 'D':     // Disable keypad reading
-        inputEnabled = false;
-        Serial.println("Reading disabled (D)");
+      case 'R':   // Reset buffer
+        keyCount = 0;
+        Serial.println("Buffer reset (R)");
         break;
 
       default:
-        Serial.print("Unknown command: ");
+        Serial.print("Unknown I2C cmd: ");
         Serial.println(cmd);
         break;
     }
   }
 }
+
+
 
 
