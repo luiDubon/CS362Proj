@@ -2,100 +2,67 @@
 #include <LiquidCrystal.h>
 #include <Adafruit_NeoPixel.h>
 
-// ------------- I2C SETUP -------------
-#define LCD_SLAVE_ADDR 0x20   // change if needed
+// ============ I2C ADDRESS ============
+#define LCD_SLAVE_ADDR 0x20
 
-// ------------- LCD SETUP -------------
-
-// LCD pin mapping: RS, E, D4, D5, D6, D7
+// ============ LCD SETUP ============
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
-
 const int LCD_COLS = 16;
-const int LCD_ROWS = 2;
 
-// Scrolling welcome message (looped)
 String welcomeMsg = "   Welcome to the game!   ";
-int scrollIndex = 0;
-unsigned long lastScrollTime = 0;
-const unsigned long scrollInterval = 400;  // ms
-
-// Bottom line when idle
 String bottomLine = "Press start --->";
 
-// ------------- GAME STATE -------------
-const int STATE_IDLE    = 0;
+int scrollIndex = 0;
+unsigned long lastScrollTime = 0;
+const unsigned long scrollInterval = 400;
+
+// ============ GAME STATE ============
+const int STATE_IDLE = 0;
 const int STATE_PLAYING = 1;
-const int STATE_WIN     = 2;
-const int STATE_LOSE    = 3;
+const int STATE_WIN = 2;
+const int STATE_LOSE = 3;
 
 int gameState = STATE_IDLE;
 
-// Flags set by I2C onReceive handler
+// I2C flags
 volatile bool startFlag = false;
-volatile bool winFlag   = false;
-volatile bool loseFlag  = false;
-volatile bool resetFlag = false;
+volatile bool winFlag = false;
+volatile bool loseFlag = false;
 
-// ------------- RGB STRIP SETUP -------------
+// score from master (ex: l.20 → score = 20)
+volatile int pendingScore = 0;
 
+// ============ RGB STRIP ============
 #define LED_PIN 7
-#define NUM_LEDS 30   // Change to your number of LEDs
+#define NUM_LEDS 30
 
 Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 unsigned long lastColorTime = 0;
 uint16_t colorWheelPos = 0;
 
-// ------------- FUNCTION DECLARATIONS -------------
-void startGame();
-void resetGame();
-void setWin();
-void setLose();
-
-void scrollWelcomeMessage();
-void fadeRGBStrip();
-
-void printWelcomeStatic();
-void printPlaying();
-void printWin();
-void printLose();
-
-String padOrTrim(String s, int n);
-
-// I2C callback
-void onReceiveCommand(int numBytes);
-
-// ------------- SETUP -------------
-
+// ======================================================
+//                   SETUP
+// ======================================================
 void setup() {
-  // LCD
-  lcd.begin(LCD_COLS, LCD_ROWS);
+  lcd.begin(16, 2);
   lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Loading...");
-  lcd.setCursor(0, 1);
-  lcd.print(bottomLine);
+  lcd.setCursor(0,0); lcd.print("Loading...");
+  lcd.setCursor(0,1); lcd.print(bottomLine);
 
-  // RGB strip
   strip.begin();
-  strip.setBrightness(40);   // 0–255
+  strip.setBrightness(40);
   strip.show();
 
-  // I2C slave
   Wire.begin(LCD_SLAVE_ADDR);
   Wire.onReceive(onReceiveCommand);
 
-  // Start in idle (welcome scrolling)
   gameState = STATE_IDLE;
 }
 
-// ------------- MAIN LOOP -------------
-
+// ======================================================
+//                   MAIN LOOP
+// ======================================================
 void loop() {
-  // Handle flags set from I2C interrupt
-  if (resetFlag) {
-    resetFlag = false;
-    resetGame();
-  }
 
   if (startFlag) {
     startFlag = false;
@@ -104,169 +71,113 @@ void loop() {
 
   if (winFlag) {
     winFlag = false;
-    setWin();
+    showWin();
   }
 
   if (loseFlag) {
     loseFlag = false;
-    setLose();
+    showLose(pendingScore);   // score from "l.xx"
   }
 
-  // When idle, run scrolling welcome text
   if (gameState == STATE_IDLE) {
     scrollWelcomeMessage();
   }
 
-  // Always run RGB fade
   fadeRGBStrip();
 }
 
-// ------------- I2C RECEIVE HANDLER -------------
+// ======================================================
+//                 I2C RECEIVE
+// ======================================================
+void onReceiveCommand(int count) {
+  String incoming = "";
 
-void onReceiveCommand(int numBytes) {
   while (Wire.available()) {
-    char cmd = Wire.read();
+    incoming += (char)Wire.read();
+  }
 
-    switch (cmd) {
-      case 's':   // start game
-        startFlag = true;
-        break;
-      case 'w':   // win
-        winFlag = true;
-        break;
-      case 'l':   // lose
-        loseFlag = true;
-        break;
-      case 'r':   // reset back to welcome
-        resetFlag = true;
-        break;
-      default:
-        // ignore unknown commands
-        break;
-    }
+  // ---- Start Game ----
+  if (incoming == "s") {
+    startFlag = true;
+    return;
+  }
+
+  // ---- Win ----
+  if (incoming == "w") {
+    winFlag = true;
+    return;
+  }
+
+  // ---- Lose + Score ----
+  // Format expected: "l.20"
+  if (incoming.startsWith("l.")) {
+    pendingScore = incoming.substring(2).toInt();
+    loseFlag = true;
+    return;
   }
 }
 
-// ------------- GAME STATE FUNCTIONS -------------
-
+// ======================================================
+//                 GAME STATE HANDLERS
+// ======================================================
 void startGame() {
   gameState = STATE_PLAYING;
   lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Game started!  ");
-  lcd.setCursor(0, 1);
-  lcd.print("Good luck :)   ");
+  lcd.setCursor(0,0); lcd.print("Game started!");
+  lcd.setCursor(0,1); lcd.print("Good luck :) ");
 }
 
-void resetGame() {
-  gameState = STATE_IDLE;
-  lcd.clear();
-  // scrolling welcome will take over in loop()
-}
-
-void setWin() {
+void showWin() {
   gameState = STATE_WIN;
-
   lcd.clear();
-  printWin();
+  lcd.setCursor(0,0); lcd.print("   YOU WIN!   ");
+  lcd.setCursor(0,1); lcd.print("Nice memory :)");
 }
 
-void setLose() {
+void showLose(int score) {
   gameState = STATE_LOSE;
-
   lcd.clear();
-  printLose();
+  lcd.setCursor(0,0); lcd.print("   YOU LOST!  ");
+
+  lcd.setCursor(0,1);
+  lcd.print("Reached lvl ");
+  lcd.print(score);
 }
 
-// ------------- LCD MESSAGE HELPERS -------------
-
-void printWelcomeStatic() {
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print(" Memory Matrix ");
-  lcd.setCursor(0, 1);
-  lcd.print(bottomLine);
-}
-
-void printPlaying() {
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Playing...     ");
-  lcd.setCursor(0, 1);
-  lcd.print("Focus!         ");
-}
-
-void printWin() {
-  lcd.setCursor(0, 0);
-  lcd.print("   YOU WIN!    ");
-  lcd.setCursor(0, 1);
-  lcd.print("Nice memory :) ");
-}
-
-void printLose() {
-  lcd.setCursor(0, 0);
-  lcd.print("   YOU LOSE    ");
-  lcd.setCursor(0, 1);
-  lcd.print("Try again...   ");
-}
-
-// ------------- SCROLLING TEXT (IDLE) -------------
-
+// ======================================================
+//                 SCROLLING TEXT
+// ======================================================
 void scrollWelcomeMessage() {
   unsigned long now = millis();
-  if (now - lastScrollTime < scrollInterval) {
-    return;
-  }
+  if (now - lastScrollTime < scrollInterval) return;
   lastScrollTime = now;
 
-  String window = "";
   int len = welcomeMsg.length();
+  String window = "";
 
-  for (int i = 0; i < LCD_COLS; i++) {
+  for (int i=0; i<LCD_COLS; i++) {
     int idx = (scrollIndex + i) % len;
     window += welcomeMsg[idx];
   }
 
-  lcd.setCursor(0, 0);
-  lcd.print(window);
-
-  lcd.setCursor(0, 1);
-  lcd.print(padOrTrim(bottomLine, LCD_COLS));
+  lcd.setCursor(0,0); lcd.print(window);
+  lcd.setCursor(0,1); lcd.print(bottomLine);
 
   scrollIndex++;
-  if (scrollIndex >= len) {
-    scrollIndex = 0;
-  }
+  if (scrollIndex >= len) scrollIndex = 0;
 }
 
-// ------------- RGB FADE FUNCTION -------------
-
+// ======================================================
+//                 RGB FADE EFFECT
+// ======================================================
 void fadeRGBStrip() {
-  unsigned long now = millis();
-
-  // Adjust speed (bigger = slower)
-  if (now - lastColorTime < 20)
-    return;
-
-  lastColorTime = now;
+  if (millis() - lastColorTime < 20) return;
+  lastColorTime = millis();
 
   uint32_t color = strip.ColorHSV(colorWheelPos * 256);
   strip.fill(color);
   strip.show();
 
   colorWheelPos++;
-  if (colorWheelPos >= 255)
-    colorWheelPos = 0;
-}
-
-// ------------- STRING UTIL -------------
-
-String padOrTrim(String s, int n) {
-  if ((int)s.length() > n) {
-    return s.substring(0, n);
-  }
-  while ((int)s.length() < n) {
-    s += " ";
-  }
-  return s;
+  if (colorWheelPos >= 255) colorWheelPos = 0;
 }
