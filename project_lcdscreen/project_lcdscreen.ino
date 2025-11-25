@@ -120,15 +120,22 @@ void setupInputPins() {
   pinMode(PIN_B3, INPUT);
 }
 
-// Read score from the 4-bit inputs (0–15)
+// Read score from the 4-bit inputs and map it to 0–100
 int readScoreFromPins() {
   int b0 = digitalRead(PIN_B0);
   int b1 = digitalRead(PIN_B1);
   int b2 = digitalRead(PIN_B2);
   int b3 = digitalRead(PIN_B3);
 
-  // Convert binary bits to integer
-  int value = (b0) + (b1 << 1) + (b2 << 2) + (b3 << 3);
+  // Convert binary bits to integer 0–15
+  int raw = (b0) + (b1 << 1) + (b2 << 2) + (b3 << 3);
+
+  // Clamp to max "level" of 10 so score max is 100
+  if (raw > 10) raw = 10;
+
+  // Map 0–10 → 0–100 (steps of 10)
+  int value = raw * 10;
+
   return value;
 }
 
@@ -266,7 +273,7 @@ void displayIncomingMessage(const String &msg) {
   String line2 = "";
 
   if (msg.length() > LCD_COLS) {
-    line2 = msg.substring(LCD_COLS, min(2 * LCD_COLS, msg.length()));
+    line2 = msg.substring(0, min(2 * LCD_COLS, msg.length()));
   }
 
   lcd.setCursor(0, 0);
