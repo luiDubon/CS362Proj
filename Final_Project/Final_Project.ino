@@ -3,7 +3,7 @@
 #include <string.h>
 
 #define MAX_KEYS   100      
-#define SLAVE_ADDR 0x10     
+#define SLAVE_ADDR 0x3     
 
 const byte ROWS = 4;
 const byte COLS = 4;
