@@ -33,7 +33,7 @@ int currentDigitIndex = 0;
 unsigned long showDuration = 800;   // show digit for 800ms
 unsigned long pauseDuration = 250;  // pause between digits
 bool inPause = false;
-
+bool doneDisplaying = false;
 
 void setup(){
     
@@ -62,15 +62,14 @@ void loop(){
 
     //if cmd was received, 
     if(gotCmd){
-      
-      if(cmd == "LIFE"){
-        lives--;
+      Serial.println(cmd)
+      if(cmd == "C"){ buzz(true); }
+
+      if(cmd == "I"){ 
+        --lives;
         updateLives();
-      }
-
-      if(cmd == "CORRECT"){ buzz(true); }
-
-      if(cmd == "INCORRECT"){ buzz(false); }
+        buzz(false); 
+        }
 
       gotCmd = false;
     }
@@ -96,6 +95,19 @@ nevermind, just remembered we have to send difficulty and whether game should st
 */
 void handleRequest(){
   //maybe send difficulty?
+  //let master know he is ready to enable keypad
+
+  //if true, transmit, otherwise n for no
+  if(doneDisplaying){
+    //d for done
+    Wire.write('d');
+    doneDisplaying = false;
+  } else {
+    Wire.write('c');
+  }
+
+
+  
 }
 
 /*
@@ -109,7 +121,8 @@ void handleReceive(int bytes){
   String incoming = "";
 
   while(Wire.available()){
-    incoming += (char)Wire.read();
+    char c = Wire.read();
+    incoming += c;
   }
 
   if(incoming.startsWith("SEQ:")){
@@ -170,6 +183,7 @@ void displaySequence(){
     if (currentDigitIndex >= sequenceLength) {
         showingSequence = false;
         sevseg.blank(); // optional
+        doneDisplaying = true;
         return;
     }
 
@@ -192,4 +206,6 @@ void displaySequence(){
             currentDigitIndex++;   // move to next digit
         }
     }
+
+
 }
