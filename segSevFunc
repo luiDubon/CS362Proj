@@ -1,0 +1,210 @@
+#include "SevSeg.h"
+#include <Wire.h>
+#include <string.h>
+
+SevSeg sevseg;
+
+// ---------------- 7-SEG SETUP ----------------
+byte numDigits = 1;
+byte digitPins[] = {};
+byte segmentPins[] = {6, 5, 2, 3, 4, 7, 8, 9};
+bool resistorsOnSegments = true;
+byte hardwareConfig = COMMON_CATHODE;
+
+// ---------------- GAME FLAGS ----------------
+bool gameStart = false;
+
+char sequenceBuffer[32];
+int sequenceLength = 0;
+String cmd = "";
+bool receivedSequence = false;
+bool gotCmd = false;
+
+// ---------------- DEBUG TEST MODE ----------------
+bool testMode = true;   // << set false when master is connected
+bool testStarted = false;
+
+// ---------------- HARDWARE ----------------
+const int buzzerPin = A0;
+const int ledPins[3] = {10, 11, 12};
+int lives = 3;
+
+// ---------------- DISPLAY STATE ----------------
+bool showingSequence = false;
+unsigned long lastDigitTime = 0;
+int currentDigitIndex = 0;
+unsigned long showDuration = 800;
+unsigned long pauseDuration = 250;
+bool inPause = false;
+bool doneDisplaying = false;
+
+void setup() {
+
+  // ---- 7-seg ----
+  sevseg.begin(hardwareConfig, numDigits, digitPins, segmentPins, resistorsOnSegments);
+  sevseg.setBrightness(90);
+
+  // ---- LEDs ----
+  for (int i = 0; i < 3; i++) pinMode(ledPins[i], OUTPUT);
+  for (int i = 0; i < 3; i++) digitalWrite(ledPins[i], HIGH);
+
+  // ---- Buzzer ----
+  pinMode(buzzerPin, OUTPUT);
+
+  // ---- I2C ----
+  Wire.begin(2);
+  Wire.onRequest(handleRequest);
+  Wire.onReceive(handleReceive);
+
+  // ---- Serial ----
+  Serial.begin(9600);
+  Serial.println("Booted.");
+}
+
+// ---------------- LOOP ----------------
+void loop() {
+
+  // ==== TEST MODE ====
+  if (testMode && !testStarted) {
+    strcpy(sequenceBuffer, "3142");   // test sequence
+    sequenceLength = 4;
+
+    Serial.println("TEST MODE: Injecting sequence '3142'");
+    receivedSequence = true;
+    testStarted = true;
+  }
+
+  // ==== COMMAND HANDLING ====
+  if (gotCmd) {
+    Serial.print("CMD: ");
+    Serial.println(cmd);
+
+    if (cmd == "C") {
+      buzz(true);
+    }
+
+    if (cmd == "I") {
+      lives--;
+      updateLives();
+      buzz(false);
+    }
+
+    if (cmd == "R") {
+      lives = 3;
+      updateLives();
+    }
+
+    gotCmd = false;
+  }
+
+  // ==== START SEQUENCE ====
+  if (receivedSequence) {
+    startSequence(sequenceBuffer, sequenceLength);
+    receivedSequence = false;
+  }
+
+  // ==== DISPLAY ENGINE ====
+  if (showingSequence) {
+    displaySequence();
+  }
+
+  sevseg.refreshDisplay();
+}
+
+// ---------------- I2C REQUEST ----------------
+void handleRequest() {
+  if (doneDisplaying) {
+    Wire.write('d');
+    doneDisplaying = false;
+  }
+}
+
+// ---------------- I2C RECEIVE ----------------
+void handleReceive(int bytes) {
+  String incoming = "";
+
+  while (Wire.available()) {
+    char c = Wire.read();
+    incoming += c;
+  }
+
+  if (incoming.startsWith("SEQ:")) {
+    sequenceLength = 0;
+    for (int i = 4; i < incoming.length(); i++) {
+      char c = incoming[i];
+      if (c == '#') break;
+      sequenceBuffer[sequenceLength++] = c;
+    }
+
+    sequenceBuffer[sequenceLength] = '\0';
+    receivedSequence = true;
+    return;
+  }
+
+  cmd = incoming;
+  gotCmd = true;
+}
+
+// ---------------- LED LIVES ----------------
+void updateLives() {
+  for (int i = 0; i < 3; i++) digitalWrite(ledPins[i], LOW);
+  for (int i = 0; i < lives; i++) digitalWrite(ledPins[i], HIGH);
+}
+
+// ---------------- BUZZER ----------------
+void buzz(bool correct) {
+  int freq = correct ? 1200 : 400;
+  tone(buzzerPin, freq);
+  delay(300);
+  noTone(buzzerPin);
+}
+
+// ---------------- START DISPLAY ----------------
+void startSequence(char* sequence, int len) {
+  currentDigitIndex = 0;
+  showingSequence = true;
+  inPause = false;
+  lastDigitTime = millis();
+  doneDisplaying = false;
+
+  Serial.print("Starting sequence: ");
+  Serial.println(sequence);
+}
+
+// ---------------- DISPLAY SEQUENCE ----------------
+void displaySequence() {
+  unsigned long now = millis();
+
+  if (currentDigitIndex >= sequenceLength) {
+    showingSequence = false;
+    sevseg.blank();
+    doneDisplaying = true;
+
+    Serial.println("Sequence DONE.");
+    return;
+  }
+
+  if (!inPause) {
+    int digit = sequenceBuffer[currentDigitIndex] - '0';
+    sevseg.setNumber(digit);
+
+    Serial.print("Displaying digit: ");
+    Serial.println(digit);
+
+    if (now - lastDigitTime >= showDuration) {
+      inPause = true;
+      lastDigitTime = now;
+      Serial.println("Pause...");
+    }
+  }
+  else {
+    if (now - lastDigitTime >= pauseDuration) {
+      inPause = false;
+      lastDigitTime = now;
+      currentDigitIndex++;
+
+      Serial.print("Next index: ");
+      Serial.println(currentDigitIndex);
+    }
+  }
+}
