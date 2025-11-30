@@ -1,0 +1,89 @@
+#include <Wire.h>
+
+const int buzzerPin = A0;
+const int ledPins[3] = {10, 11, 12};
+int lives = 3;
+String cmd = "";
+
+
+void setup() {
+  // put your setup code here, to run once:
+  for(int i = 0; i < 3; i++){
+    pinMode(ledPins[i], OUTPUT);
+  }
+
+  for(int i = 0; i < 3; i++){
+    digitalWrite(ledPins[i], HIGH);
+  }
+
+  pinMode(buzzerPin, OUTPUT);
+  //address for slave to send/receive info
+  Wire.begin(2);
+  Wire.onRequest(handleRequest);
+  Wire.onReceive(handleReceive);
+  
+  //debugginng
+  Serial.begin(9600);
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  
+
+  if (Serial.available() > 0) {
+    char input = Serial.read();   // Read ONE character
+
+    Serial.print("You typed: ");
+    Serial.println(input);
+
+    if (input == 'C') {
+      buzz(true);
+      tone(buzzerPin, 1200, 500);
+    }
+    else if (input == 'I') {
+      --lives;
+      updateLives();
+      buzz(false);
+      tone(buzzerPin, 400, 500);
+    }
+   
+  }
+}
+
+void handleRequest(){
+  
+}
+
+void handleReceive(int bytes){
+
+
+  while(Wire.available()){
+    char c = Wire.read();
+    cmd += c;
+  }
+}
+
+
+//depending on boolean, emit difference pitch to our buzzer;
+void buzz(bool correct){
+  if(correct){
+    tone(buzzerPin, 1200, 500);
+  } else {
+    tone(buzzerPin, 400, 500);
+  }
+
+    noTone(buzzerPin);
+}
+
+
+//lower the lit LED which represent the lives an user has 
+void updateLives(){
+  for(int i = 0; i < 3; i++){ 
+    digitalWrite(ledPins[i], LOW);
+  }
+
+  for(int i = 0; i < lives; i++){
+    digitalWrite(ledPins[i], HIGH);
+  }
+
+}
