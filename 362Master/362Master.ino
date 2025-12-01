@@ -1,3 +1,21 @@
+/*
+Harasimowicz, Zachary
+Lozano, Brian
+Dubon, Luis
+Zhang, Vincent
+NetID:zhara2
+      bloza4
+      ldubo
+      vzhan2
+CS 362, FINAL GROUP PROJECT MASTER FILE
+ABSTRACT:
+  The memory matrix is a memory game using the keypad that challenges the player to remember and enter the number sequence as it continues to grow longer. 
+  It’s built using multiple Arduinos connected with I2C, the system uses audio and visual feedback to create an arcade-style experience. 
+  Players will progress through levels that also increase in difficulty. 
+
+
+  Demonstrated on: 12/1/2025 @ 430PM
+*/
 #include <Wire.h>
 
 const int buttonPin = 7;
@@ -36,10 +54,10 @@ void setup() {
 }
 
 void startNewRound() {
-  buildNums();      // fills nums[0..roundNum-1]
-  guessIndex = 0;   // start expecting from position 0
+  buildNums();   
+  guessIndex = 0;  
   yetToGuess = true;
-  waitForGuess = true; // or whatever your state machine needs
+  waitForGuess = true; 
 
 
 
@@ -90,12 +108,12 @@ bool checkGuess(int digit) {
       sendLoseToLCD(roundNum);
       clearKeypadBuffer();
       resetGame();
-      return true;   // stop processing further digits this batch
+      return true;
     }
 
     // Let them restart this round from the beginning
     guessIndex = 0;
-    return false;    // round not finished, game still alive
+    return false;   
   }
 
   // If correct so far:
@@ -105,17 +123,17 @@ bool checkGuess(int digit) {
   if (guessIndex >= roundNum) {
     Serial.println("Round complete!");
 
-    roundNum++;        // next round is longer
+    roundNum++;        
     guessIndex = 0;
-    waitForGuess = false;  // so loop() will call startNewRound()
+    waitForGuess = false; 
     yetToGuess = true;
     acceptingInput = false; 
     clearKeypadBuffer();
 
-    return true;       // round finished – stop reading more digits
+    return true;     
   }
 
-  return false;        // still mid-sequence
+  return false;        
 }
 
 
@@ -131,7 +149,7 @@ void resetGame(){
 
   isStarted = false;
   waitForGuess = false;
-  yetToGuess = false;   // no active round
+  yetToGuess = false;   
   acceptingInput = false;
   Wire.beginTransmission(SLAVESEG);
   Wire.write('R');
@@ -140,7 +158,7 @@ void resetGame(){
 
 
 void readDigitsFromKeypad() {
-  int bytes = Wire.requestFrom(SLAVEKEY, 32); // enough for count + digits
+  int bytes = Wire.requestFrom(SLAVEKEY, 32);
   if (bytes <= 0) return;
   if (!Wire.available()) return;
 
@@ -166,14 +184,14 @@ void readDigitsFromKeypad() {
 
 void sendLoseToLCD(int levelReached) {
   Wire.beginTransmission(SLAVELCD);
-  Wire.write('l');       // command: lose
-  Wire.print(levelReached);  // send level as ASCII digits, e.g. "5"
+  Wire.write('l');     
+  Wire.print(levelReached);  
   Wire.endTransmission();
 }
 
 void clearKeypadBuffer() {
   Wire.beginTransmission(SLAVEKEY);
-  Wire.write('R');     // tell keypad slave: reset buffer
+  Wire.write('R');  
   Wire.endTransmission();
 }
 
