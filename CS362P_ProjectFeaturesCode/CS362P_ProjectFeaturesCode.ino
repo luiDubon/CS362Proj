@@ -11,18 +11,16 @@ byte segmentPins[] = {6, 5, 2, 3, 4, 7, 8, 9};
 bool resistorsOnSegments = true;
 byte hardwareConfig = COMMON_CATHODE; 
 
-//easy, medium, hard. updated by first button. 
-char difficulty[3] = {'e', 'm', 'h'};
 //update on other button press.
 bool gameStart = false;
 
 char sequenceBuffer[32];
 int sequenceLength = 0;
 String cmd = "";
-bool receivedSequence = false;
+bool receivedSequence = false;  
 bool gotCmd = false;
 
-const int buzzerPin = 13;
+const int buzzerPin = A0;
 const int ledPins[3] = {10, 11, 12}; 
 int lives = 3;
 
@@ -30,8 +28,8 @@ int lives = 3;
 bool showingSequence = false;
 unsigned long lastDigitTime = 0;
 int currentDigitIndex = 0;
-unsigned long showDuration = 800;   // show digit for 800ms
-unsigned long pauseDuration = 250;  // pause between digits
+unsigned long showDuration = 1200;   // show digit for 800ms
+unsigned long pauseDuration = 350;  // pause between digits
 bool inPause = false;
 bool doneDisplaying = false;
 
@@ -44,9 +42,13 @@ void setup(){
     pinMode(ledPins[i], OUTPUT);
   }
 
+  for(int i = 0; i < 3; i++){
+    digitalWrite(ledPins[i], HIGH);
+  }
+
   pinMode(buzzerPin, OUTPUT);
   //address for slave to send/receive info
-  Wire.begin(0x30);
+  Wire.begin(2);
   Wire.onRequest(handleRequest);
   Wire.onReceive(handleReceive);
   
@@ -62,15 +64,20 @@ void loop(){
 
     //if cmd was received, 
     if(gotCmd){
-      Serial.println(cmd)
-      if(cmd == "C"){ buzz(true); }
-
+      Serial.println(cmd);
+      
       if(cmd == "I"){ 
+        //will probably only have incorrect
         --lives;
         updateLives();
         buzz(false); 
+        
         }
 
+      if(cmd == "R"){
+        lives = 3;
+        updateLives();
+      }
       gotCmd = false;
     }
 
@@ -102,12 +109,8 @@ void handleRequest(){
     //d for done
     Wire.write('d');
     doneDisplaying = false;
-  } else {
-    Wire.write('c');
-  }
+  } 
 
-
-  
 }
 
 /*
@@ -164,7 +167,7 @@ void buzz(bool correct){
   if(correct){
     tone(buzzerPin, 1200, 500);
   } else {
-    tone(buzzerPin, 400, 500);
+    tone(buzzerPin, 800, 1000);
   }
 }
 
