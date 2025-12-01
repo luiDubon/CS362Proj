@@ -8,6 +8,7 @@ NetID:zhara2
       ldubo
       vzhan2
 CS 362, FINAL GROUP PROJECT MASTER FILE
+Group #27
 ABSTRACT:
   The memory matrix is a memory game using the keypad that challenges the player to remember and enter the number sequence as it continues to grow longer. 
   It’s built using multiple Arduinos connected with I2C, the system uses audio and visual feedback to create an arcade-style experience. 
