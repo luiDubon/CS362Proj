@@ -7,6 +7,7 @@ bool isStarted = false;
 bool yetToGuess = false;
 bool waitForGuess = false;
 bool acceptingInput = false;
+bool gameStarted = false;
 
 int roundNum = 1;
 int lives = 3;
@@ -39,6 +40,7 @@ void startNewRound() {
   guessIndex = 0;   // start expecting from position 0
   yetToGuess = true;
   waitForGuess = true; // or whatever your state machine needs
+
 
 
 
@@ -204,12 +206,10 @@ void loop() {
 
 
       if(buttonState == HIGH){
-        isStarted    = true;
-        lives        = 3;
-        roundNum     = 1;
-        guessIndex   = 0;
-        yetToGuess   = true;
-        waitForGuess = false;  // so loop() will call startNewRound()
+        resetGame();
+        isStarted = true;
+        yetToGuess = true;
+        waitForGuess = false;
 
         Wire.beginTransmission(SLAVELCD);
         Wire.write('s');
