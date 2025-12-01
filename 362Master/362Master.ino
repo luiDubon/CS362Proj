@@ -11,6 +11,7 @@ bool acceptingInput = false;
 int roundNum = 1;
 int lives = 3;
 int guessIndex = 0;
+String numString;
 
 
 int buttonState;
@@ -38,6 +39,10 @@ void startNewRound() {
   guessIndex = 0;   // start expecting from position 0
   yetToGuess = true;
   waitForGuess = true; // or whatever your state machine needs
+
+
+
+
   acceptingInput = true; 
 }
 
@@ -45,61 +50,19 @@ void startNewRound() {
 void buildNums(){
   delete[] nums;
   nums = new int[roundNum];
+  numString = "SEQ:";
   for(int i = 0; i < roundNum;++i){
     //Fill nums with random numbers 0-9 up to roundNum times
     nums[i] = random(10);
     Serial.println(nums[i]);
+    numString += nums[i];
   }
+
+  Wire.beginTransmission(SLAVESEG);
+  Wire.write(numString.c_str());
+  Wire.endTransmission();
 }
 
-
-// void checkGuess(int digit) {
-//   Serial.print("Received digit: ");
-//   Serial.println(digit);
-
-//   Serial.print("Expecting nums[");
-//   Serial.print(guessIndex);
-//   Serial.print("] = ");
-//   Serial.println(nums[guessIndex]);
-
-//   // Wrong digit?
-//   if (digit != nums[guessIndex]) {
-//     lives--;
-//     Serial.print("Wrong! Lives left: ");
-//     Serial.println(lives);
-
-//     // TODO: send "wrong" to LCD/SEG here
-
-//     if (lives < 1) {
-//       Serial.println("Game over!");
-//       sendLoseToLCD(roundNum);
-//       resetGame();
-//       return;
-//     }
-
-//     // Let them restart this round from the beginning
-//     guessIndex = 0;   // start sequence over
-//     return;
-//   }
-
-//   // If correct so far:
-//   guessIndex++;
-
-//   // Finished the whole sequence correctly?
-//   if (guessIndex >= roundNum) {
-//     Serial.println("Round complete!");
-
-//     // TODO: send "success" to LCD/SEG
-
-//     roundNum++;        // next round is longer
-//     guessIndex = 0;    // reset for next round
-//     waitForGuess = false;
-//     yetToGuess = true;
-
-//     // Optionally call startNewRound() here when you're ready:
-//     // startNewRound();
-//   }
-// }
 
 bool checkGuess(int digit) {
   Serial.print("Received digit: ");
@@ -115,6 +78,10 @@ bool checkGuess(int digit) {
     lives--;
     Serial.print("Wrong! Lives left: ");
     Serial.println(lives);
+    Wire.beginTransmission(SLAVESEG);
+    Wire.write('I');
+    Wire.endTransmission();
+    
 
     if (lives < 1) {
       Serial.println("Game over!");
@@ -164,6 +131,9 @@ void resetGame(){
   waitForGuess = false;
   yetToGuess = false;   // no active round
   acceptingInput = false;
+  Wire.beginTransmission(SLAVESEG);
+  Wire.write('R');
+  Wire.endTransmission();
 }
 
 
@@ -191,27 +161,6 @@ void readDigitsFromKeypad() {
     }
   }
 }
-
-
-// void readDigitsFromKeypad() {
-//   int bytes = Wire.requestFrom(SLAVEKEY, 32); // enough for count + digits
-//   if (bytes <= 0) return;
-
-//   if (!Wire.available()) return;
-
-//   // first byte is count
-//   int keyCount = Wire.read();
-//   //Serial.print("KeyCount: ");
-//   //Serial.println(keyCount);
-
-//   for (int i = 0; i < keyCount && Wire.available(); ++i) {
-//     char c = (char)Wire.read();  
-//     if (c >= '0' && c <= '9') {
-//       int d = c - '0';          
-//       checkGuess(d);             
-//     }
-//   }
-// }
 
 void sendLoseToLCD(int levelReached) {
   Wire.beginTransmission(SLAVELCD);
