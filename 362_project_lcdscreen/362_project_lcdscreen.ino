@@ -29,7 +29,7 @@ volatile bool loseFlag  = false;
 // score from master 
 volatile int pendingScore = 0;
 
-// ============ RGB STRIP ============
+// rgb strip stuff
 #define LED_PIN 7
 #define NUM_LEDS 30
 
@@ -65,7 +65,7 @@ void loop() {
 
   if (loseFlag) {
     loseFlag = false;
-    showLose(pendingScore);   // score built from chars after 'l'
+    showLose(pendingScore);
   }
 
   if (gameState == idle) {
