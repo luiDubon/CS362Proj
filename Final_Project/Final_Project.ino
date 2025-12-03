@@ -23,13 +23,11 @@ Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS)
 char keyBuffer[MAX_KEYS];
 int  keyCount = 0;
 
-// Forward declarations
+
 void sendKeys();
 void receiveCommand(int bytes);
 
-// -------------------------------------------------------
-// SETUP
-// -------------------------------------------------------
+// setup
 void setup() {
   Wire.begin(SLAVE_ADDR);
   Wire.onRequest(sendKeys);
@@ -39,9 +37,7 @@ void setup() {
   Serial.println("Keypad slave online (always-reading mode)");
 }
 
-// -------------------------------------------------------
-// MAIN LOOP — always reading keypad input
-// -------------------------------------------------------
+//loop
 void loop() {
 
   char key = customKeypad.getKey();
@@ -60,7 +56,6 @@ void loop() {
     // '#' marks the end of the sequence
     else if (key == '#') {
       Serial.println("Sequence ended with '#'");
-      // KeyCount stays—master decides when to read
     }
 
     // ignore all other keys
@@ -71,9 +66,7 @@ void loop() {
   }
 }
 
-// -------------------------------------------------------
-// I2C SEND — called ONLY when master requests data
-// -------------------------------------------------------
+//i2c send
 void sendKeys() {
 
   // send count first
@@ -92,17 +85,15 @@ void sendKeys() {
   keyCount = 0;
 }
 
-// -------------------------------------------------------
-// I2C RECEIVE — only used for clearing/reset
-// -------------------------------------------------------
+// i2c receive
 void receiveCommand(int bytes) {
 
   while (Wire.available()) {
     char cmd = (char)Wire.read();
 
     switch (cmd) {
-
-      case 'R':   // Reset buffer
+      // buffer reset
+      case 'R':   
         keyCount = 0;
         Serial.println("Buffer reset (R)");
         break;
